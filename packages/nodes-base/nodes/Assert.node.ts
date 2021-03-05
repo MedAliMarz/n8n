@@ -34,23 +34,28 @@ export class Assert implements INodeType {
 				options: [
 					{
 						name: 'Compare JSON',
-						value: 'compare',
+						value: 'compareJSON',
 						description: 'Compare JSON to input item.',
 					},
+					{
+						name: 'Compare Binary',
+						value: 'compareBinary',
+						description: 'Compare binary data to input binary item.',
+					},
 				],
-				default: 'compare',
+				default: 'compareJSON',
 				description: 'Operation to perform.',
 			},
 
 			// ----------------------------------
-			//         compare
+			//         compare JSON
 			// ----------------------------------
 			{
 				displayName: 'JSON',
 				displayOptions: {
 					show: {
 						operation: [
-							'compare',
+							'compareJSON',
 						],
 					},
 				},
@@ -65,7 +70,7 @@ export class Assert implements INodeType {
 				displayOptions: {
 					show: {
 						operation: [
-							'compare',
+							'compareJSON',
 						],
 					},
 				},
@@ -80,7 +85,7 @@ export class Assert implements INodeType {
 				displayOptions: {
 					show: {
 						operation: [
-							'compare',
+							'compareJSON',
 						],
 					},
 				},
@@ -95,7 +100,7 @@ export class Assert implements INodeType {
 				displayOptions: {
 					show: {
 						operation: [
-							'compare',
+							'compareJSON',
 						],
 					},
 				},
@@ -105,8 +110,83 @@ export class Assert implements INodeType {
 				description: 'Ignore JSON values.',
 				required: true,
 			},
-
-			
+			// ----------------------------------
+			//         compare Binary
+			// ----------------------------------
+			{
+				displayName: 'File Data',
+				displayOptions: {
+					show: {
+						operation: [
+							'compareBinary',
+						],
+					},
+				},
+				name: 'data',
+				type: 'string',
+				default: '',
+				placeholder: 'iVBORw0KGgoAAAANSUhEUgAAAdAAAABqCAMAAAA7p....',
+				description: 'The file base64 encoded data',
+				required: true,
+			},
+			{
+				displayName: 'Property Name',
+				displayOptions: {
+					show: {
+						operation: [
+							'compareBinary',
+						],
+					},
+				},
+				name: 'dataPropertyName',
+				type: 'string',
+				default: 'data',
+				description: 'Name of the binary property containing the data.',
+				required: true,
+			},
+			// ----------------------------------
+			//         Options : compare Binary
+			// ----------------------------------
+			{
+				displayName: 'Options',
+				name: 'options',
+				type: 'collection',
+				placeholder: 'Add Option',
+				displayOptions: {
+					show: {
+						operation: [
+							'compareBinary',
+						],
+					},
+				},
+				default: {},
+				options: [
+					{
+						displayName: 'File Name',
+						name: 'fileName',
+						type: 'string',
+						default: '',
+						placeholder: 'filename.extension',
+						description: 'The file name.',
+					},
+					{
+						displayName: 'File Extension',
+						name: 'fileExtension',
+						type: 'string',
+						default: '',
+						placeholder:'png',
+						description: 'the file extension.',
+					},
+					{
+						displayName: 'Mime Type',
+						name: 'mimeType',
+						type: 'string',
+						default: '',
+						placeholder:'image/png',
+						description: 'The file mimetype.',
+					},
+				],
+			},
 		],
 	};
 
@@ -121,10 +201,10 @@ export class Assert implements INodeType {
 
 		for (let itemIndex = 0; itemIndex < length; itemIndex++) {
 			item = items[itemIndex];
-			const action = this.getNodeParameter('operation', itemIndex) as string;
+			const operation = this.getNodeParameter('operation', itemIndex) as string;
 			const newItem:INodeExecutionData={json:{}};
 
-			if (action === 'compare') {
+			if (operation === 'compareJSON') {
 				const json = JSON.parse(this.getNodeParameter('json', itemIndex) as string) as IDataObject;
 				const isExtraIgnored = this.getNodeParameter('extraKeys', itemIndex) as boolean;
 				const isMissingIgnored = this.getNodeParameter('missingKeys', itemIndex) as boolean;
@@ -160,6 +240,34 @@ export class Assert implements INodeType {
 					missingKeys,
 					extraKeys,
 					missmatchedValuesKeys,
+				};
+			}
+			if (operation === 'compareBinary') {
+				const data = this.getNodeParameter('data', itemIndex) as string;
+				const dataPropertyName = this.getNodeParameter('dataPropertyName', itemIndex) as string;				
+				const options = this.getNodeParameter('options', itemIndex) as IDataObject;
+				if (item.binary === undefined) {
+					throw new Error('Item does not contain any binary data.');
+				}
+	
+				if (item.binary[dataPropertyName as string] === undefined) {
+					throw new Error(`Item does not contain any binary data with the name "${dataPropertyName}".`);
+				}
+
+				// comparing base64 data
+				if(item.binary[dataPropertyName as string].data !== data){
+					throw new Error(`Item binary data unmatched with the provided binary data.`);
+				}
+
+				// comparing the options
+				Object.keys(options).forEach(key=> {					
+					if(options[key as string] !== undefined && options[key as string] !== item.binary![dataPropertyName as string][key as string] ){
+						throw new Error(`Item ${key as string} doesn't match`);
+					}
+				});
+				
+				newItem.json = {
+					success: true,
 				};
 			}
 			returnData.push(newItem);
